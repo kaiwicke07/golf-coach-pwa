@@ -153,8 +153,8 @@
           
           setDebugInfo('🚀 Sending to Gemini AI...');
 
-          // Use the v1beta endpoint which is more stable
-          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+          // Try v1 endpoint instead of v1beta
+          const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
           console.log('API URL:', apiUrl.replace(apiKey, 'HIDDEN'));
           
@@ -306,13 +306,15 @@
                       </svg>
                     </div>
                     <div>
-                      <p className="text-amber-300 text-sm font-semibold mb-2">⚡ Get FREE API Key</p>
+                      <p className="text-amber-300 text-sm font-semibold mb-2">⚡ Important Setup Steps</p>
                       <ol className="text-slate-400 text-xs space-y-1.5 leading-relaxed">
                         <li>1. Go to: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline font-medium">aistudio.google.com/app/apikey</a></li>
                         <li>2. Click <strong className="text-amber-300">"Create API Key"</strong></li>
                         <li>3. Select <strong className="text-amber-300">"Create API key in new project"</strong></li>
-                        <li>4. Copy the FULL key (starts with AIza...)</li>
-                        <li>5. Paste above and click <strong className="text-amber-300">"Test Key"</strong></li>
+                        <li>4. Go to: <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">Enable Generative Language API</a></li>
+                        <li>5. Click <strong className="text-amber-300">"Enable"</strong> button</li>
+                        <li>6. Wait 2-3 minutes for activation</li>
+                        <li>7. Copy your API key and paste above</li>
                       </ol>
                     </div>
                   </div>
