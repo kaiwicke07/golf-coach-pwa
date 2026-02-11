@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwingIQ - Golf Coach</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    function App() {
+      const [key, setKey] = useState('');
+      const [video, setVideo] = useState(null);
+      const [preview, setPreview] = useState(null);
+      const [frame, setFrame] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [result, setResult] = useState(null);
+      const [err, setErr] = useState(null);
+      const [show, setShow] = useState(true);
+      const fileRef = useRef(null);
+      const vidRef = useRef(null);
+
+      useEffect(() => {
+        const saved = localStorage.getItem('key');
+        if (saved) {
+          setKey(saved);
+          setShow(false);
+        }
+      }, []);
+
+      const save = () => {
+        if (key.trim()) {
+          localStorage.setItem('key', key.trim());
+          setShow(false);
+        }
+      };
+
+      const pick = (e) => {
+        const f = e.target.files[0];
+        if (f && f.type.startsWith('video/')) {
+          setVideo(f);
+          setPreview(URL.createObjectURL(f));
+          setErr(null);
+          setResult(null);
+          setFrame(null);
+        }
+      };
+
+      const capture = () => {
+        if (!vidRef.current) return null;
+        const v = vidRef.current;
+        if (v.readyState < 2) return null;
+        const c = document.createElement('canvas');
+        c.width = v.videoWidth;
+        c.height = v.videoHeight;
+        c.getContext('2d').drawImage(v, 0, 0);
+        return c.toDataURL('image/jpeg', 0.8);
+      };
+
+      const analyze = async () => {
+        if (!video || !key) return;
+        setLoading(true);
+        setErr(null);
+
+        try {
+          const img = capture();
+          if (!img) throw new Error('Capture failed. Play video, pause, try again.');
+          
+          setFrame(img);
+          const b64 = img.split(',')[1];
+
+          const res = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key,
+            {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    {inline_data: {mime_type: 'image/jpeg', data: b64}},
+                    {text: 'Golf coach: analyze this swing position. JSON only: {"analysis": "2 sentences", "issues": ["issue 1", "issue 2"], "drills": [{"name": "drill", "purpose": "fix", "steps": ["s1", "s2", "s3"], "frequency": "daily"}]}'}
+                  ]
+                }]
+              })
+            }
+          );
+
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error('API failed (' + res.status + '): ' + txt.substring(0, 100));
+          }
+
+          const data = await res.json();
+          let txt = data.candidates[0].content.parts[0].text;
+          txt = txt.replace(/```json/g, '').replace(/```/g, '').trim();
+          const match = txt.match(/\{[\s\S]*\}/);
+          
+          if (match) {
+            setResult(JSON.parse(match[0]));
+          } else {
+            throw new Error('Parse failed');
+          }
+        } catch (e) {
+          setErr(e.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (show) {
+        return (
+          <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-slate-800 p-8 rounded-2xl">
+              <h1 className="text-4xl font-bold mb-2 text-emerald-400">SwingIQ</h1>
+              <p className="text-slate-400 mb-6 text-sm">Gemini 1.5 Flash</p>
+              <input
+                type="text"
+                value={key}
+                onChange={e => setKey(e.target.value)}
+                placeholder="AIza..."
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white mb-4"
+              />
+              {err && <p className="text-red-400 text-sm mb-4">{err}</p>}
+              <button onClick={save} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-semibold">
+                Start
+              </button>
+              <p className="text-xs text-slate-500 mt-4">Get free key: aistudio.google.com/app/apikey</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-900 text-white p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h1 className="text-3xl font-bold text-emerald-400">SwingIQ</h1>
+              <button onClick={() => setShow(true)} className="px-4 py-2 bg-slate-800 rounded-lg text-sm">Settings</button>
+            </div>
+
+            <div className="bg-slate-800 rounded-2xl p-6 mb-6">
+              <input ref={fileRef} type="file" accept="video/*" onChange={pick} className="hidden" />
+              {!preview ? (
+                <div onClick={() => fileRef.current?.click()} className="p-16 text-center cursor-pointer hover:bg-slate-700 rounded-xl">
+                  <p className="text-xl mb-2">Upload Golf Swing Video</p>
+                  <p className="text-sm text-slate-400">Click to select</p>
+                </div>
+              ) : (
+                <div>
+                  <video ref={vidRef} src={preview} controls playsInline className="w-full rounded-xl mb-4 bg-black" style={{maxHeight: '500px'}} />
+                  <p className="text-sm text-blue-400 mb-4">💡 Pause at key position, then click Analyze</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => fileRef.current?.click()} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl">
+                      Change
+                    </button>
+                    <button onClick={analyze} disabled={loading} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-semibold disabled:opacity-50">
+                      {loading ? 'Analyzing...' : 'Analyze Frame'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {err && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6">
+                <p className="text-red-300 text-sm">{err}</p>
+              </div>
+            )}
+
+            {result && (
+              <div className="space-y-6">
+                {frame && <img src={frame} className="w-full rounded-xl mb-6" alt="Frame" />}
+                
+                <div className="bg-slate-800 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-emerald-400 mb-3">Analysis</h2>
+                  <p className="text-slate-300">{result.analysis}</p>
+                </div>
+
+                <div className="bg-slate-800 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-amber-400 mb-3">Issues</h2>
+                  {result.issues?.map((issue, i) => (
+                    <div key={i} className="flex gap-3 mb-3">
+                      <span className="text-amber-400 font-bold">{i + 1}.</span>
+                      <span className="text-slate-300">{issue}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-slate-800 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-blue-400 mb-3">Drills</h2>
+                  {result.drills?.map((drill, i) => (
+                    <div key={i} className="mb-6 last:mb-0">
+                      <h3 className="font-bold text-blue-400 mb-1">{drill.name}</h3>
+                      <p className="text-sm text-slate-400 mb-2 italic">{drill.purpose}</p>
+                      {drill.steps?.map((step, j) => (
+                        <div key={j} className="flex gap-2 mb-1">
+                          <span className="text-blue-400">{j + 1}.</span>
+                          <span className="text-slate-300 text-sm">{step}</span>
+                        </div>
+                      ))}
+                      <p className="text-xs text-slate-500 mt-2">Practice: {drill.frequency}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>
